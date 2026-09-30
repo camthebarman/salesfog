@@ -1,6 +1,7 @@
 import {
   parseScript, objectionList, renderBody, placeholdersIn, escapeHtml, SAMPLE_SCRIPT, TZ_SCRIPT,
 } from './script-engine.js';
+import * as backend from './client-api.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -179,9 +180,7 @@ $('call-form').addEventListener('submit', async (e) => {
 
   let analysis;
   try {
-    const res = await fetch(`/api/analyze?url=${encodeURIComponent(url)}`);
-    analysis = await res.json();
-    if (!res.ok) throw new Error(analysis.error || `HTTP ${res.status}`);
+    analysis = await backend.analyze(url);
     $('analyze-status').textContent = '';
   } catch (err) {
     // Still let the rep make the call; they can pick the industry by hand.
@@ -299,19 +298,12 @@ function nearbyFields() {
 }
 
 // ---------- prospect location + nearby similar places ----------
-async function api(path, params) {
-  const res = await fetch(`${path}?${new URLSearchParams(params)}`);
-  const body = await res.json().catch(() => ({}));
-  if (!res.ok) throw Object.assign(new Error(body.error || `HTTP ${res.status}`), { body });
-  return body;
-}
-
 async function locateProspect() {
   const { id } = call;
   call.location = { loading: true };
   renderLocation();
   try {
-    const loc = await api('/api/locate', { url: call.analysis.url, company: call.analysis.company || '' });
+    const loc = await backend.locate(call.analysis.url, call.analysis.company || '');
     if (call?.id !== id) return;
     call.location = loc;
   } catch (err) {
@@ -332,7 +324,7 @@ async function loadNearby() {
   call.nearby = { loading: true };
   renderNearby();
   try {
-    const result = await api('/api/nearby', {
+    const result = await backend.nearby({
       lat: location.lat, lng: location.lng, industry: call.industryId, exclude: call.analysis.company || '',
     });
     if (call?.id !== id) return;
@@ -385,7 +377,7 @@ $('call-location').addEventListener('submit', async (e) => {
   call.location = { loading: true };
   renderLocation();
   try {
-    const loc = await api('/api/geocode', { q });
+    const loc = await backend.geocodeAddress(q);
     if (call?.id !== id) return;
     call.location = loc;
   } catch (err) {
@@ -608,10 +600,11 @@ document.addEventListener('keydown', (e) => {
 async function boot() {
   renderScriptPicker();
   renderHistory();
-  try {
-    profiles = await (await fetch('/api/profiles')).json();
-  } catch {
-    profiles = [{ id: 'generic', label: 'General business', vocab: { customers: 'customers', customer: 'customer', venue: 'business', team: 'team', offering: 'offering', visit: 'visit' } }];
+  profiles = await backend.init();
+  if (backend.mode === 'static') {
+    $('proxy-settings').hidden = false;
+    $('proxy-url').value = backend.getProxy();
+    $('proxy-url').addEventListener('change', (e) => backend.setProxy(e.target.value));
   }
   $('industry-ids').innerHTML = profiles.map((p) => `<code>${p.id}</code>`).join(' ');
   showView('setup');

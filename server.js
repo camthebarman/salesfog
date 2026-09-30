@@ -2,7 +2,7 @@ import http from 'node:http';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { fetchSite } from './lib/fetch-site.js';
+import { fetchSite, expandLink } from './lib/fetch-site.js';
 import { analyzeHtml } from './lib/analyze.js';
 import { publicProfiles } from './lib/industries.js';
 import { locateBusiness, geocode } from './lib/location.js';
@@ -43,10 +43,14 @@ function sendJson(res, status, body) {
   res.end(JSON.stringify(body));
 }
 
+const LIB_DIR = path.join(path.dirname(PUBLIC_DIR), 'lib');
+
 async function serveStatic(req, res, pathname) {
   const rel = pathname === '/' ? 'index.html' : decodeURIComponent(pathname).replace(/^\/+/, '');
-  const file = path.join(PUBLIC_DIR, rel);
-  if (!file.startsWith(PUBLIC_DIR + path.sep)) return sendJson(res, 403, { error: 'Forbidden' });
+  // The browser shares lib/ with the server (public/ imports ../lib/*.js).
+  const [root, relPath] = rel.startsWith('lib/') ? [LIB_DIR, rel.slice(4)] : [PUBLIC_DIR, rel];
+  const file = path.join(root, relPath);
+  if (!file.startsWith(root + path.sep)) return sendJson(res, 403, { error: 'Forbidden' });
   try {
     const data = await readFile(file);
     res.writeHead(200, { 'content-type': TYPES[path.extname(file)] || 'application/octet-stream' });
@@ -76,7 +80,9 @@ const server = http.createServer(async (req, res) => {
       const company = searchParams.get('company') || '';
       let page = null;
       try { page = await getPage(searchParams.get('url')); } catch { /* fall back to a name search */ }
-      const location = await locateBusiness({ html: page?.html || '', url: page?.url || '', company });
+      const location = await locateBusiness({
+        html: page?.html || '', url: page?.url || '', company, fetchPage: fetchSite, expandLink,
+      });
       if (!location || location.lat === null) return sendJson(res, 404, { error: 'Could not find an address for this business.', address: location?.address || null });
       return sendJson(res, 200, location);
     } catch (err) {

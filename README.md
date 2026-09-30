@@ -11,6 +11,22 @@ npm test
 
 You need Node 18 or newer. There are no dependencies.
 
+## Hosted version (GitHub Pages)
+
+**https://camthebarman.github.io/salesfog/**
+
+The hosted version runs entirely in your browser, with no server. Scripts, settings and call history stay in your browser's local storage.
+
+A browser can't read another company's website directly, so the hosted version fetches websites through a proxy. It tries free public proxies, but they're often down. For reliable website reading:
+
+1. Create a free Cloudflare account and go to **Workers & Pages → Create → Create Worker**.
+2. Replace the example code with [`proxy/cloudflare-worker.js`](proxy/cloudflare-worker.js), then click **Deploy**.
+3. In Salesfog, open **Website reader settings** on the Setup page and paste the worker's URL, for example `https://salesfog-proxy.yourname.workers.dev`.
+
+The worker only accepts requests from `camthebarman.github.io` and `localhost:3000`. Edit `ALLOWED_ORIGINS` in the worker to change that.
+
+Without a working proxy, address lookup and nearby places still work, but industry detection and POS detection need the website. If you use `npm start`, the Node server reads websites itself and no proxy is needed.
+
 ## How it works
 
 1. **Load a script.** Upload a `.txt` or `.md` file, drop one on the editor, or paste one in. Scripts are saved in your browser's localStorage. The TZ BitBar referral script and a sample loyalty script are included.

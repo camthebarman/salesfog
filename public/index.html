@@ -65,6 +65,16 @@
           <input type="text" id="my-company" placeholder="Acme Loyalty">
         </label>
         <div id="script-fields" class="span-2 grid" hidden></div>
+        <details id="proxy-settings" class="span-2 help" hidden>
+          <summary>Website reader settings</summary>
+          <p>This hosted version runs entirely in your browser, which can't read other websites directly, so it
+            goes through a proxy. Free public proxies are tried by default but are often down. For reliable
+            results, deploy the small proxy in <code>proxy/cloudflare-worker.js</code> (free on Cloudflare) and paste its URL here.
+            Addresses and nearby places work either way.</p>
+          <label>Proxy URL
+            <input type="text" id="proxy-url" placeholder="https://salesfog-proxy.yourname.workers.dev" autocomplete="off">
+          </label>
+        </details>
         <div class="span-2 row">
           <button class="btn primary" type="submit" id="start-btn">Analyze site &amp; start call</button>
           <span class="muted" id="analyze-status" role="status"></span>
