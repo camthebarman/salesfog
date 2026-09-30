@@ -36,8 +36,9 @@
           <ul>
             <li><code># Step title</code> starts a new step. No headings? Each paragraph becomes a step.</li>
             <li><code># Objection: Not interested</code> — your rebuttal for that button. Also <code>Not the right time</code>, <code>Already using a competitor</code>, or any custom objection.</li>
-            <li>Placeholders: <code>{{prospect}}</code> <code>{{first_name}}</code> <code>{{company}}</code> <code>{{my_name}}</code> <code>{{my_company}}</code> <code>{{industry}}</code> <code>{{pos}}</code> (POS system, detected from their website)</li>
-            <li>Any other placeholder, like <code>{{local_bar}}</code>, becomes a field you fill in before the call.</li>
+            <li>Placeholders: <code>{{prospect}}</code> <code>{{first_name}}</code> <code>{{company}}</code> <code>{{my_name}}</code> <code>{{my_company}}</code> <code>{{industry}}</code> <code>{{pos}}</code> (POS system, detected from their website) <code>{{address}}</code> <code>{{city}}</code></li>
+            <li><code>{{local_bar}}</code> (or any <code>{{local_…}}</code> / <code>{{nearby_…}}</code>) is filled with the nearest similar place to the prospect; pick another from the list during the call.</li>
+            <li>Any other placeholder, like <code>{{new_menu}}</code>, becomes a field you fill in before the call.</li>
             <li>Industry words: <code>{{customers}}</code> <code>{{customer}}</code> <code>{{venue}}</code> <code>{{team}}</code> <code>{{offering}}</code> <code>{{visit}}</code> — e.g. a diner gets “regulars”, a cocktail bar gets “clients”. Capitalize to capitalize: <code>{{Customers}}</code>.</li>
             <li>With <em>auto-adapt</em> on, plain words like “customers” are swapped too.</li>
             <li><code>[diner, cafe] line</code> shows a line only for those industries; <code>[!diner] line</code> hides it. Industries: <span id="industry-ids"></span></li>
@@ -87,6 +88,7 @@
       <div>
         <div class="prospect-name" id="call-prospect"></div>
         <div class="muted"><a id="call-company-link" target="_blank" rel="noopener"></a></div>
+        <div id="call-location" class="call-location"></div>
       </div>
       <div class="industry">
         <label>Industry
@@ -98,6 +100,7 @@
         <input type="checkbox" id="auto-adapt" checked> Auto-adapt wording
       </label>
       <div id="call-fields" class="call-fields" hidden></div>
+      <div id="nearby" class="nearby" hidden></div>
     </section>
 
     <div class="call-layout">

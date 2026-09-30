@@ -47,10 +47,13 @@ function activeScript() {
 // Placeholders the app fills in by itself; anything else in a script
 // becomes a field the rep fills in before (or during) the call.
 const AUTO_VARS = new Set(['prospect', 'first_name', 'company', 'website', 'industry', 'my_name', 'my_company',
-  'customers', 'customer', 'venue', 'team', 'offering', 'visit']);
+  'address', 'city', 'customers', 'customer', 'venue', 'team', 'offering', 'visit']);
 const FIELD_HINTS = {
   pos: { label: 'POS system', placeholder: 'Detected from their website if left blank' },
 };
+// Fields like {{local_bar}} are filled with the nearest similar business.
+const isNearbyField = (key) => /^(local|nearby)_/.test(key);
+const NEARBY_HINT = 'Leave blank to use the nearest similar place';
 
 function scriptFields(text) {
   return placeholdersIn(text).filter((k) => !AUTO_VARS.has(k));
@@ -64,7 +67,7 @@ function renderFieldInputs(container, keys, values, placeholders = {}) {
   container.innerHTML = keys.map((k) => `
     <label>${escapeHtml(fieldLabel(k))}
       <input type="text" data-field="${k}" value="${escapeHtml(values[k] || '')}"
-        placeholder="${escapeHtml(placeholders[k] ?? FIELD_HINTS[k]?.placeholder ?? '')}" autocomplete="off">
+        placeholder="${escapeHtml(placeholders[k] ?? FIELD_HINTS[k]?.placeholder ?? (isNearbyField(k) ? NEARBY_HINT : ''))}" autocomplete="off">
     </label>`).join('');
   container.hidden = !keys.length;
 }
@@ -218,6 +221,10 @@ function startCall(prospect, analysis, fields) {
     objectionLog: [],
     activeObjection: null,
     fields,
+    id: crypto.randomUUID(),
+    location: null, // { address, lat, lng, city, source }
+    nearby: null, // { noun, places, source } | { loading } | { error }
+    nearbyPick: '', // auto-picked nearest place, used when the rep left the field blank
   };
   $('nav-call').hidden = false;
   renderCallHeader();
@@ -225,6 +232,7 @@ function startCall(prospect, analysis, fields) {
   renderObjectionButtons();
   renderStep();
   showView('call');
+  locateProspect();
 }
 
 function currentVocab() {
@@ -247,6 +255,9 @@ function renderContext() {
       my_name: r.name,
       my_company: r.company,
       pos: call.analysis.pos || '',
+      address: call.location?.address || '',
+      city: call.location?.city || '',
+      ...Object.fromEntries(nearbyFields().map((k) => [k, call.nearbyPick])),
       ...Object.fromEntries(Object.entries(call.fields).filter(([, v]) => v)),
     },
   };
@@ -274,18 +285,174 @@ function renderCallFields() {
   const keys = scriptFields(call.parsed.steps.map((st) => st.body).join('\n')
     + call.objections.map((o) => o.body).join('\n'));
   const placeholders = { pos: call.analysis.pos ? `Detected: ${call.analysis.pos}` : 'Not found on their website' };
+  for (const k of keys.filter(isNearbyField)) {
+    placeholders[k] = call.nearbyPick ? `Nearest: ${call.nearbyPick}` : 'Pick from nearby places below';
+  }
   renderFieldInputs($('call-fields'), keys, call.fields, placeholders);
 }
+
+function callScriptText() {
+  return call.parsed.steps.map((st) => st.body).join('\n') + call.objections.map((o) => o.body).join('\n');
+}
+function nearbyFields() {
+  return scriptFields(callScriptText()).filter(isNearbyField);
+}
+
+// ---------- prospect location + nearby similar places ----------
+async function api(path, params) {
+  const res = await fetch(`${path}?${new URLSearchParams(params)}`);
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw Object.assign(new Error(body.error || `HTTP ${res.status}`), { body });
+  return body;
+}
+
+async function locateProspect() {
+  const { id } = call;
+  call.location = { loading: true };
+  renderLocation();
+  try {
+    const loc = await api('/api/locate', { url: call.analysis.url, company: call.analysis.company || '' });
+    if (call?.id !== id) return;
+    call.location = loc;
+  } catch (err) {
+    if (call?.id !== id) return;
+    call.location = { error: err.message, address: err.body?.address || '' };
+  }
+  renderLocation();
+  renderStep();
+  loadNearby();
+}
+
+async function loadNearby() {
+  const { id, location } = call;
+  if (!location || location.lat == null) {
+    call.nearby = null;
+    return renderNearby();
+  }
+  call.nearby = { loading: true };
+  renderNearby();
+  try {
+    const result = await api('/api/nearby', {
+      lat: location.lat, lng: location.lng, industry: call.industryId, exclude: call.analysis.company || '',
+    });
+    if (call?.id !== id) return;
+    call.nearby = result;
+    call.nearbyPick = result.places[0]?.name || '';
+    // A place picked from the previous list no longer applies to a new area.
+    for (const k of nearbyFields()) {
+      if (call.fields[k] && call.fields[k] === call.pickedFromList) call.fields[k] = '';
+    }
+  } catch (err) {
+    if (call?.id !== id) return;
+    call.nearby = { error: err.message };
+  }
+  renderNearby();
+  renderCallFields();
+  renderStep();
+}
+
+function renderLocation() {
+  const loc = call.location;
+  const el = $('call-location');
+  if (!loc) { el.innerHTML = ''; return; }
+  if (loc.loading) { el.innerHTML = '<span class="muted">Finding their address…</span>'; return; }
+  const edit = `<button class="btn link small" id="loc-edit">${loc.error ? 'Enter address' : 'Change'}</button>`;
+  el.innerHTML = loc.error
+    ? `<span class="error">${escapeHtml(loc.error)}</span> ${edit}`
+    : `📍 ${escapeHtml(loc.address || `${loc.lat.toFixed(4)}, ${loc.lng.toFixed(4)}`)}
+       <span class="muted small">· from ${escapeHtml(loc.source)}${loc.approximate ? ' (approximate)' : ''}</span> ${edit}`;
+}
+
+$('call-location').addEventListener('click', (e) => {
+  if (e.target.id !== 'loc-edit') return;
+  const current = call.location?.address || '';
+  $('call-location').innerHTML = `
+    <form id="loc-form" class="row">
+      <input type="text" id="loc-input" value="${escapeHtml(current)}" placeholder="Street, city" autocomplete="off">
+      <button class="btn secondary small" type="submit">Look up</button>
+      <button class="btn link small" type="button" id="loc-cancel">Cancel</button>
+    </form>`;
+  $('loc-input').focus();
+});
+$('call-location').addEventListener('click', (e) => {
+  if (e.target.id === 'loc-cancel') renderLocation();
+});
+$('call-location').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const q = $('loc-input').value.trim();
+  if (!q) return;
+  const { id } = call;
+  call.location = { loading: true };
+  renderLocation();
+  try {
+    const loc = await api('/api/geocode', { q });
+    if (call?.id !== id) return;
+    call.location = loc;
+  } catch (err) {
+    if (call?.id !== id) return;
+    call.location = { error: err.message, address: q };
+  }
+  renderLocation();
+  renderStep();
+  loadNearby();
+});
+
+const useMiles = /-(US|GB|LR|MM)$/i.test(navigator.language || '');
+function formatDistance(m) {
+  if (useMiles) {
+    const mi = m / 1609.34;
+    return mi < 0.1 ? `${Math.round(m * 3.281)} ft` : `${mi.toFixed(mi < 10 ? 1 : 0)} mi`;
+  }
+  return m < 1000 ? `${m} m` : `${(m / 1000).toFixed(1)} km`;
+}
+
+function renderNearby() {
+  const el = $('nearby');
+  const n = call.nearby;
+  el.hidden = !n;
+  if (!n) return;
+  if (n.loading) { el.innerHTML = '<div class="muted small">Finding similar places nearby…</div>'; return; }
+  if (n.error) { el.innerHTML = `<div class="error small">Nearby search failed: ${escapeHtml(n.error)}</div>`; return; }
+  const fields = nearbyFields();
+  const chosen = fields.length ? (call.fields[fields[0]] || call.nearbyPick) : '';
+  el.innerHTML = `
+    <div class="nearby-head">
+      <strong>Nearby ${escapeHtml(n.noun)}</strong>
+      <span class="muted small">${fields.length ? `click one to use it for {{${escapeHtml(fields[0])}}}` : ''} · ${escapeHtml(n.source)}</span>
+    </div>
+    ${n.places.length ? `<ul class="nearby-list">${n.places.map((p, i) => `
+      <li class="${p.name === chosen ? 'chosen' : ''}">
+        <button data-place="${i}" ${fields.length ? '' : 'disabled'}>
+          <span class="place-name">${escapeHtml(p.name)}</span>
+          <span class="muted small">${escapeHtml(p.kind)} · ${formatDistance(p.distanceM)}${p.address ? ` · ${escapeHtml(p.address)}` : ''}</span>
+        </button>
+        <a class="small" target="_blank" rel="noopener" title="Open in Google Maps"
+          href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${p.name} ${p.address || ''}`)}">map</a>
+      </li>`).join('')}</ul>` : '<div class="muted small">No similar places found nearby.</div>'}`;
+}
+
+$('nearby').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-place]');
+  if (!b) return;
+  const place = call.nearby.places[Number(b.dataset.place)];
+  for (const k of nearbyFields()) call.fields[k] = place.name;
+  call.pickedFromList = place.name;
+  renderCallFields();
+  renderNearby();
+  renderStep();
+});
 $('call-fields').addEventListener('input', (e) => {
   const input = e.target.closest('[data-field]');
   if (!input) return;
   call.fields[input.dataset.field] = input.value.trim();
+  if (isNearbyField(input.dataset.field)) renderNearby();
   renderStep();
 });
 
 $('industry-select').addEventListener('change', (e) => {
   call.industryId = e.target.value;
   renderStep();
+  loadNearby();
 });
 $('auto-adapt').addEventListener('change', () => call && renderStep());
 

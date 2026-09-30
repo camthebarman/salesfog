@@ -47,7 +47,9 @@ Totally fair, {{first_name}}...
 | `{{industry}}` | Detected industry label |
 | `{{my_name}}`, `{{my_company}}` | Your details from Setup |
 | `{{pos}}` | POS system detected from the site's ordering and gift-card links (Toast, Square, Clover, Lightspeed, SpotOn, TouchBistro, ...). You can fill it in or correct it before or during the call. |
-| anything else, e.g. `{{local_bar}}` | Becomes a field you fill in before the call, and can edit during it |
+| `{{address}}`, `{{city}}` | The prospect's address, found on their website |
+| `{{local_bar}}`, or any `{{local_…}}` / `{{nearby_…}}` | The nearest similar place to the prospect (see below). Type a name to override it. |
+| anything else, e.g. `{{new_menu}}` | Becomes a field you fill in before the call, and can edit during it |
 | `{{customers}}`, `{{customer}}` | e.g. regulars, clients, guests, patients, members |
 | `{{venue}}`, `{{team}}`, `{{offering}}`, `{{visit}}` | e.g. diner/bar/salon, staff/bar team, menu/cocktail program |
 
@@ -58,6 +60,22 @@ Totally fair, {{first_name}}...
 - A missing built-in objection falls back to a sensible default rebuttal.
 
 Industry profiles and their vocabulary are defined in `lib/industries.js`. Add or tweak profiles there.
+
+## Address and nearby places
+
+When a call starts, Salesfog finds the prospect's address. It checks these sources in order:
+
+1. schema.org structured data or map metadata on their homepage
+2. Google Maps links, following `maps.app.goo.gl` short links
+3. a street address in the page text
+4. their Contact or Visit page
+5. a map search for the business name, as a last resort
+
+The address shown on the call screen names its source. Click **Change** to type a different one.
+
+Salesfog then lists similar places nearby, chosen by the detected industry. A cocktail bar gets bars (cocktail bars ranked first), a pub gets pubs, a diner gets diners and breakfast/American restaurants, and so on. The prospect itself is left out. The nearest match fills `{{local_bar}}`. Click any other place to use it instead.
+
+Location data comes from OpenStreetMap and needs no API key. Addresses are looked up with [Nominatim](https://nominatim.org), limited to one request per second under its usage policy. Nearby places come from [Overpass](https://overpass-api.de), falling back to Nominatim. You can point these at your own servers with `NOMINATIM_URL` and `OVERPASS_URL`.
 
 ## Notes
 
