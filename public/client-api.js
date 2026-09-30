@@ -20,7 +20,7 @@ async function serverApi(path, params) {
 
 export async function init() {
   try {
-    const res = await fetch('/api/profiles');
+    const res = await fetch('/api/profiles', { signal: AbortSignal.timeout(3000) });
     if (res.ok && (res.headers.get('content-type') || '').includes('json')) {
       mode = 'server';
       return res.json();
