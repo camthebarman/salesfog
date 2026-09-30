@@ -1,0 +1,14 @@
+{
+  "name": "salesfog",
+  "version": "0.1.0",
+  "description": "Browser-based sales script runner that adapts your script to each prospect's business.",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

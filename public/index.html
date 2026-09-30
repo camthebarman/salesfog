@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Salesfog</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">sales<span>fog</span></div>
+    <nav>
+      <button class="link" data-view="setup">Setup</button>
+      <button class="link" data-view="call" id="nav-call" hidden>Current call</button>
+    </nav>
+  </header>
+
+  <!-- ============ SETUP ============ -->
+  <main id="view-setup" class="view">
+    <section class="card">
+      <h2>1. Your script</h2>
+      <div class="row">
+        <select id="script-select" aria-label="Saved scripts"></select>
+        <label class="btn secondary file-btn">
+          Upload .txt / .md
+          <input type="file" id="script-file" accept=".txt,.md,.markdown,text/plain,text/markdown" hidden>
+        </label>
+        <button class="btn secondary" id="script-new">New</button>
+        <button class="btn danger-ghost" id="script-delete">Delete</button>
+      </div>
+      <input type="text" id="script-name" class="script-name" placeholder="Script name" aria-label="Script name">
+      <textarea id="script-text" spellcheck="false" placeholder="Paste or write your script here, or drop a file…"></textarea>
+      <div class="row between">
+        <details class="help">
+          <summary>Script format</summary>
+          <ul>
+            <li><code># Step title</code> starts a new step. No headings? Each paragraph becomes a step.</li>
+            <li><code># Objection: Not interested</code> — your rebuttal for that button. Also <code>Not the right time</code>, <code>Already using a competitor</code>, or any custom objection.</li>
+            <li>Placeholders: <code>{{prospect}}</code> <code>{{first_name}}</code> <code>{{company}}</code> <code>{{my_name}}</code> <code>{{my_company}}</code> <code>{{industry}}</code></li>
+            <li>Industry words: <code>{{customers}}</code> <code>{{customer}}</code> <code>{{venue}}</code> <code>{{team}}</code> <code>{{offering}}</code> <code>{{visit}}</code> — e.g. a diner gets “regulars”, a cocktail bar gets “clients”. Capitalize to capitalize: <code>{{Customers}}</code>.</li>
+            <li>With <em>auto-adapt</em> on, plain words like “customers” are swapped too.</li>
+            <li><code>[diner, cafe] line</code> shows a line only for those industries; <code>[!diner] line</code> hides it. Industries: <span id="industry-ids"></span></li>
+            <li><code>&gt; note</code> is a note to you, not read aloud. <code>- item</code> for bullets, <code>**bold**</code> for emphasis.</li>
+          </ul>
+        </details>
+        <span class="muted" id="script-status"></span>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>2. Who are you calling?</h2>
+      <form id="call-form" class="grid">
+        <label>Company website
+          <input type="text" id="company-url" placeholder="bluedoordiner.com" autocomplete="off" required>
+        </label>
+        <label>Prospect name
+          <input type="text" id="prospect-name" placeholder="Jordan Lee" autocomplete="off" required>
+        </label>
+        <label>Your name
+          <input type="text" id="my-name" placeholder="Alex">
+        </label>
+        <label>Your company
+          <input type="text" id="my-company" placeholder="Acme Loyalty">
+        </label>
+        <div class="span-2 row">
+          <button class="btn primary" type="submit" id="start-btn">Analyze site &amp; start call</button>
+          <span class="muted" id="analyze-status" role="status"></span>
+        </div>
+      </form>
+    </section>
+
+    <section class="card" id="history-card" hidden>
+      <h2>Recent calls</h2>
+      <table class="history">
+        <thead><tr><th>When</th><th>Prospect</th><th>Company</th><th>Industry</th><th>Objections</th><th>Outcome</th></tr></thead>
+        <tbody id="history-body"></tbody>
+      </table>
+      <button class="btn link small" id="history-clear">Clear history</button>
+    </section>
+  </main>
+
+  <!-- ============ CALL ============ -->
+  <main id="view-call" class="view" hidden>
+    <section class="prospect-bar">
+      <div>
+        <div class="prospect-name" id="call-prospect"></div>
+        <div class="muted"><a id="call-company-link" target="_blank" rel="noopener"></a></div>
+      </div>
+      <div class="industry">
+        <label>Industry
+          <select id="industry-select"></select>
+        </label>
+        <div class="muted small" id="industry-signals"></div>
+      </div>
+      <label class="toggle">
+        <input type="checkbox" id="auto-adapt" checked> Auto-adapt wording
+      </label>
+    </section>
+
+    <div class="call-layout">
+      <aside class="steps">
+        <ol id="step-list"></ol>
+      </aside>
+
+      <section class="script-pane">
+        <div class="step-meta muted" id="step-meta"></div>
+        <h2 id="step-title"></h2>
+        <article id="step-body" class="script-text"></article>
+
+        <div id="rebuttal" class="rebuttal" hidden>
+          <div class="rebuttal-head">
+            <span class="tag">Objection</span>
+            <h3 id="rebuttal-title"></h3>
+          </div>
+          <article id="rebuttal-body" class="script-text"></article>
+          <div class="row">
+            <button class="btn primary" id="rebuttal-back">Handled — back to script <kbd>Esc</kbd></button>
+            <button class="btn danger-ghost" id="rebuttal-lost">Still no — end call</button>
+          </div>
+        </div>
+
+        <div class="nav-row">
+          <button class="btn secondary" id="prev-btn">← Back</button>
+          <button class="btn primary" id="next-btn">Next →</button>
+        </div>
+      </section>
+    </div>
+
+    <footer class="objection-bar">
+      <span class="muted small">Objections:</span>
+      <div id="objection-buttons" class="row"></div>
+      <div class="spacer"></div>
+      <button class="btn secondary" id="end-call-btn">End call</button>
+    </footer>
+
+    <dialog id="end-dialog">
+      <form method="dialog">
+        <h3>How did it go?</h3>
+        <div class="outcomes">
+          <label><input type="radio" name="outcome" value="Meeting booked" checked> Meeting booked</label>
+          <label><input type="radio" name="outcome" value="Follow up"> Follow up</label>
+          <label><input type="radio" name="outcome" value="Not interested"> Not interested</label>
+          <label><input type="radio" name="outcome" value="No answer"> No answer / voicemail</label>
+        </div>
+        <label>Notes
+          <textarea id="end-notes" rows="3"></textarea>
+        </label>
+        <div class="row end">
+          <button class="btn secondary" value="cancel">Cancel</button>
+          <button class="btn primary" value="save">Save &amp; finish</button>
+        </div>
+      </form>
+    </dialog>
+  </main>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>
