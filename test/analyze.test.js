@@ -40,3 +40,9 @@ test('normalizeUrl adds https and rejects other schemes', () => {
   assert.throws(() => normalizeUrl('file:///etc/passwd'));
   assert.throws(() => normalizeUrl(''));
 });
+
+test('detects the POS system from ordering links', () => {
+  const html = page('Rosie\'s Diner', '<a href="https://www.toasttab.com/rosies/v3">Order online</a><a href="https://www.toasttab.com/rosies/giftcards">Gift cards</a>');
+  assert.equal(analyzeHtml(html, 'https://rosies.com').pos, 'Toast');
+  assert.equal(analyzeHtml(page('Bar', '<p>Hi</p>'), 'https://bar.com').pos, null);
+});

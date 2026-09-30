@@ -1,5 +1,5 @@
 import {
-  parseScript, objectionList, renderBody, placeholdersIn, escapeHtml, SAMPLE_SCRIPT,
+  parseScript, objectionList, renderBody, placeholdersIn, escapeHtml, SAMPLE_SCRIPT, TZ_SCRIPT,
 } from './script-engine.js';
 
 const $ = (id) => document.getElementById(id);
@@ -17,6 +17,13 @@ const store = {
 let scripts = store.get('scripts', null);
 if (!Array.isArray(scripts) || !scripts.length) {
   scripts = [{ id: crypto.randomUUID(), name: 'Sample: restaurant loyalty', text: SAMPLE_SCRIPT }];
+}
+if (!store.get('seeded:tz', false)) {
+  const tz = { id: crypto.randomUUID(), name: 'TZ: BitBar referral', text: TZ_SCRIPT };
+  scripts.unshift(tz);
+  store.set('activeScript', tz.id);
+  store.set('seeded:tz', true);
+  store.set('scripts', scripts);
 }
 let activeScriptId = store.get('activeScript', scripts[0].id);
 if (!scripts.some((s) => s.id === activeScriptId)) activeScriptId = scripts[0].id;
@@ -37,6 +44,37 @@ function activeScript() {
   return scripts.find((s) => s.id === activeScriptId);
 }
 
+// Placeholders the app fills in by itself; anything else in a script
+// becomes a field the rep fills in before (or during) the call.
+const AUTO_VARS = new Set(['prospect', 'first_name', 'company', 'website', 'industry', 'my_name', 'my_company',
+  'customers', 'customer', 'venue', 'team', 'offering', 'visit']);
+const FIELD_HINTS = {
+  pos: { label: 'POS system', placeholder: 'Detected from their website if left blank' },
+};
+
+function scriptFields(text) {
+  return placeholdersIn(text).filter((k) => !AUTO_VARS.has(k));
+}
+
+function fieldLabel(key) {
+  return FIELD_HINTS[key]?.label || key.replace(/_/g, ' ').replace(/^\w/, (c) => c.toUpperCase());
+}
+
+function renderFieldInputs(container, keys, values, placeholders = {}) {
+  container.innerHTML = keys.map((k) => `
+    <label>${escapeHtml(fieldLabel(k))}
+      <input type="text" data-field="${k}" value="${escapeHtml(values[k] || '')}"
+        placeholder="${escapeHtml(placeholders[k] ?? FIELD_HINTS[k]?.placeholder ?? '')}" autocomplete="off">
+    </label>`).join('');
+  container.hidden = !keys.length;
+}
+
+function renderSetupFields() {
+  const keys = scriptFields(activeScript().text);
+  const prev = Object.fromEntries([...$('script-fields').querySelectorAll('[data-field]')].map((i) => [i.dataset.field, i.value]));
+  renderFieldInputs($('script-fields'), keys, prev);
+}
+
 function saveScripts() {
   store.set('scripts', scripts);
   store.set('activeScript', activeScriptId);
@@ -50,6 +88,7 @@ function renderScriptPicker() {
   $('script-name').value = s.name;
   $('script-text').value = s.text;
   updateScriptStatus();
+  renderSetupFields();
 }
 
 function updateScriptStatus() {
@@ -84,6 +123,7 @@ function onScriptEdit() {
     const opt = $('script-select').selectedOptions[0];
     if (opt) opt.textContent = s.name;
     updateScriptStatus();
+    renderSetupFields();
   }, 300);
 }
 $('script-text').addEventListener('input', onScriptEdit);
@@ -127,6 +167,8 @@ $('call-form').addEventListener('submit', async (e) => {
   e.preventDefault();
   const url = $('company-url').value.trim();
   const prospect = $('prospect-name').value.trim();
+  const fields = Object.fromEntries([...$('script-fields').querySelectorAll('[data-field]')]
+    .map((i) => [i.dataset.field, i.value.trim()]));
   const btn = $('start-btn');
   btn.disabled = true;
   $('analyze-status').textContent = 'Reading their website…';
@@ -153,10 +195,10 @@ $('call-form').addEventListener('submit', async (e) => {
   } finally {
     btn.disabled = false;
   }
-  startCall(prospect, analysis);
+  startCall(prospect, analysis, fields);
 });
 
-function startCall(prospect, analysis) {
+function startCall(prospect, analysis, fields) {
   const script = activeScript();
   const parsed = parseScript(script.text);
   if (!parsed.steps.length) {
@@ -175,9 +217,11 @@ function startCall(prospect, analysis) {
     visited: new Set([0]),
     objectionLog: [],
     activeObjection: null,
+    fields,
   };
   $('nav-call').hidden = false;
   renderCallHeader();
+  renderCallFields();
   renderObjectionButtons();
   renderStep();
   showView('call');
@@ -202,6 +246,8 @@ function renderContext() {
       industry: (profile?.label || call.analysis.industry.label).toLowerCase(),
       my_name: r.name,
       my_company: r.company,
+      pos: call.analysis.pos || '',
+      ...Object.fromEntries(Object.entries(call.fields).filter(([, v]) => v)),
     },
   };
 }
@@ -223,6 +269,19 @@ function renderCallHeader() {
     sig.innerHTML = `Detected (${a.industry.confidence}% sure) from: ${a.signals.map((s) => `<span class="chip">${escapeHtml(s)}</span>`).join(' ')}`;
   }
 }
+
+function renderCallFields() {
+  const keys = scriptFields(call.parsed.steps.map((st) => st.body).join('\n')
+    + call.objections.map((o) => o.body).join('\n'));
+  const placeholders = { pos: call.analysis.pos ? `Detected: ${call.analysis.pos}` : 'Not found on their website' };
+  renderFieldInputs($('call-fields'), keys, call.fields, placeholders);
+}
+$('call-fields').addEventListener('input', (e) => {
+  const input = e.target.closest('[data-field]');
+  if (!input) return;
+  call.fields[input.dataset.field] = input.value.trim();
+  renderStep();
+});
 
 $('industry-select').addEventListener('change', (e) => {
   call.industryId = e.target.value;

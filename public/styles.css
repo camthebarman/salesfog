@@ -102,6 +102,8 @@ button.link.active { color: var(--accent); background: var(--accent-soft); }
 .industry select { max-width: 280px; }
 .industry-signals, #industry-signals { margin-top: 6px; }
 .chip { display: inline-block; background: var(--accent-soft); color: var(--accent); border-radius: 999px; padding: 0 8px; margin: 2px 0; font-size: 12px; }
+.call-fields { flex-basis: 100%; display: flex; gap: 12px; flex-wrap: wrap; border-top: 1px solid var(--border); padding-top: 12px; }
+.call-fields label { min-width: 220px; }
 .toggle { flex-direction: row; align-items: center; gap: 6px; color: var(--text); font-weight: 500; }
 
 .call-layout { display: grid; grid-template-columns: 220px 1fr; gap: 16px; }

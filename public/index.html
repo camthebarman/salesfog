@@ -36,7 +36,8 @@
           <ul>
             <li><code># Step title</code> starts a new step. No headings? Each paragraph becomes a step.</li>
             <li><code># Objection: Not interested</code> — your rebuttal for that button. Also <code>Not the right time</code>, <code>Already using a competitor</code>, or any custom objection.</li>
-            <li>Placeholders: <code>{{prospect}}</code> <code>{{first_name}}</code> <code>{{company}}</code> <code>{{my_name}}</code> <code>{{my_company}}</code> <code>{{industry}}</code></li>
+            <li>Placeholders: <code>{{prospect}}</code> <code>{{first_name}}</code> <code>{{company}}</code> <code>{{my_name}}</code> <code>{{my_company}}</code> <code>{{industry}}</code> <code>{{pos}}</code> (POS system, detected from their website)</li>
+            <li>Any other placeholder, like <code>{{local_bar}}</code>, becomes a field you fill in before the call.</li>
             <li>Industry words: <code>{{customers}}</code> <code>{{customer}}</code> <code>{{venue}}</code> <code>{{team}}</code> <code>{{offering}}</code> <code>{{visit}}</code> — e.g. a diner gets “regulars”, a cocktail bar gets “clients”. Capitalize to capitalize: <code>{{Customers}}</code>.</li>
             <li>With <em>auto-adapt</em> on, plain words like “customers” are swapped too.</li>
             <li><code>[diner, cafe] line</code> shows a line only for those industries; <code>[!diner] line</code> hides it. Industries: <span id="industry-ids"></span></li>
@@ -62,6 +63,7 @@
         <label>Your company
           <input type="text" id="my-company" placeholder="Acme Loyalty">
         </label>
+        <div id="script-fields" class="span-2 grid" hidden></div>
         <div class="span-2 row">
           <button class="btn primary" type="submit" id="start-btn">Analyze site &amp; start call</button>
           <span class="muted" id="analyze-status" role="status"></span>
@@ -95,6 +97,7 @@
       <label class="toggle">
         <input type="checkbox" id="auto-adapt" checked> Auto-adapt wording
       </label>
+      <div id="call-fields" class="call-fields" hidden></div>
     </section>
 
     <div class="call-layout">

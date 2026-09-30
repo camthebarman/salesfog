@@ -245,3 +245,26 @@ Good to hear you're already investing in your customers. What do you wish your c
 # Objection: Send me an email
 Happy to. So I send something useful rather than a generic brochure — what's the one thing you'd want it to answer?
 `;
+
+export const TZ_SCRIPT = `# Opener
+Hey {{first_name}}, it's Cam at TZ, do you know David over at BitBar?
+> Pause and let them answer.
+
+# Why I'm calling
+David actually owns BitBar, and we have been working together to automate dozens of management tasks, taking back time and putting cash back in the register across all his locations.
+It's something I thought you'd find interesting, as I heard you recently switched over to {{pos}}, is that right?
+> Let them confirm or correct the POS.
+
+# Set the meeting
+I'll actually be stopping by {{local_bar}} early in the morning on Wednesday. If I dropped by, would early afternoon Wednesday or Thursday morning work better to explore a bit more?
+> Get a specific day and time before hanging up.
+
+# Objection: Not interested
+Totally fair, {{first_name}}. I'm not asking you to change anything today. I'll already be at {{local_bar}} on Wednesday, so it's ten minutes to see what David is getting out of it. Would Thursday morning be easier?
+
+# Objection: Not the right time
+Completely get it, running a {{venue}} doesn't leave much spare time. That's exactly why I'd rather swing by than take up a call. Ten minutes, no slides. Is Thursday morning quieter than Wednesday afternoon?
+
+# Objection: Already using a competitor
+Good to hear you're already on top of it. Out of curiosity, what's still taking up the most of your time managing the {{venue}}? That's usually where we help David the most.
+`;
